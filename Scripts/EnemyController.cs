@@ -6,20 +6,26 @@ using UnityEngine.AI;
 
 public class EnemyController : MonoBehaviour
 {
+    // UIController(ゲームオーバー用)
+    public UIController uiController = default;
+
+    // SoundManager
+    public SoundManager soundManager;
+
     // 自動移動時の経路のポイント
     public Transform[] wayPoints;
     
     // 現在のウェイポイント
-    private int currentPoint = 0;
+    private int _currentPoint = 0;
     
     // エージェントの位置
-    private NavMeshAgent agent;
+    private NavMeshAgent _agent;
 
     // プレイヤーの位置
     public Transform player;
 
     //ターゲット(撮影対象)
-    private SphereCollider targetCollider;
+    private SphereCollider _targetCollider;
 
     // オブジェクトの移動速度を格納する変数
     public float moveSpeed;
@@ -27,21 +33,15 @@ public class EnemyController : MonoBehaviour
     // オブジェクトがターゲットに向かって移動を開始する距離を格納する変数
     public float moveDistance;
 
-    // オブジェクトがターゲットに向かっての移動を止める距離を格納する変数
-    public float stopDistance;
-
-    // PlayerController
-    public PlayerController playerController;
-
-    private Animator animator;
+    // 撮影対象の動作
+    private Animator _animator;
 
     void Start()
     {
-
         // エージェントの取得
-        agent = GetComponent<NavMeshAgent>();
+        _agent = GetComponent<NavMeshAgent>();
         // 撮影対象のコライダーの取得
-        targetCollider = GameObject.FindGameObjectWithTag("Target").GetComponent<SphereCollider>();
+        _targetCollider = GameObject.FindGameObjectWithTag("Target").GetComponent<SphereCollider>();
 
         // 最初のエージェント位置へ移動
         GoToNextPoint();
@@ -55,43 +55,66 @@ public class EnemyController : MonoBehaviour
         // 変数 distance を作成してオブジェクトの位置とターゲットオブジェクトの距離を格納
         float distance = Vector3.Distance(transform.position, playerPosition);
 
-        //GetComponentを用いてAnimatorコンポーネントを取り出す.
-        animator = this.GetComponent<Animator>();
-
-        //あらかじめ設定していたintパラメーター「trans」の値を取り出す.
-        bool dead = animator.GetBool("Dead");
-
-        // にんにくを持っている場合、動きが止まる
-        if (playerController._itemFlag)
+        // オブジェクトがターゲットに向かって移動を開始する距離内の場合プレイヤーを追尾する
+        if (distance < moveDistance)
         {
+            // 撮影対象がプレイヤーを追尾する
+            _agent.SetDestination(playerPosition);
+        }
+        else if (distance >= moveDistance) 
+        {
+            // 距離外の場合は自動で移動
+            // エージェント位置を次々に移動していく
+            if (!_agent.pathPending && _agent.remainingDistance < 0.1f)
+            {
+                GoToNextPoint();
+            }
+        }
+    }
+    private void OnCollisionEnter(Collision collision)
+    {
+        // Targetと当たったらゲームオーバー
+        if (collision.gameObject.CompareTag("Player"))
+        {
+            // 効果音を出す
+            soundManager.SoundClip6();
+            uiController.ActiveGameOver();
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        // itemと当たったら倒れる
+        if (other.gameObject.CompareTag("Item"))
+        {
+
+            soundManager._isTargetDeathFlg = true;
+
+            // BGMを戻す
+            soundManager.SoundBGM();
+
+            // 効果音を出す
+            soundManager.SoundClip4();
+            soundManager.SoundClip5();
+
+            // 当たったアイテムは削除
+            Destroy(other.gameObject);
+
+            // GetComponentを用いてAnimatorコンポーネントを取り出す.
+            _animator = this.GetComponent<Animator>();
+
+            // あらかじめ設定していたintパラメーター「trans」の値を取り出す.
+            bool dead = _animator.GetBool("Dead");
+
             // エージェント停止
-            agent.isStopped = true;
+            _agent.isStopped = true;
             // deadのアニメーションを流す
             dead = true;
-            animator.SetBool("Dead", dead);
+            _animator.SetBool("Dead", dead);
 
             // Colliderの設定変更(撮影範囲とオブジェクトの滑り防止)
-            targetCollider.radius = 3.0f;
-            targetCollider.isTrigger = true;
-        }
-        else
-        {
-
-            // オブジェクトがターゲットに向かって移動を開始する距離内の場合プレイヤーを追尾する
-            if (distance < moveDistance)
-            {
-                // 撮影対象がプレイヤーを追尾する
-                agent.SetDestination(playerPosition);
-            }
-            else
-            {
-                // 距離外の場合は自動で移動
-                // エージェント位置を次々に移動していく
-                if (!agent.pathPending && agent.remainingDistance < 0.1f)
-                {
-                    GoToNextPoint();
-                }
-            }
+            _targetCollider.radius = 3.0f;
+            _targetCollider.isTrigger = true;
         }
     }
 
@@ -103,9 +126,9 @@ public class EnemyController : MonoBehaviour
             return;
 
         // 現在のウェイポイント（wayPoints[currentPoint]）の位置を設定
-        agent.SetDestination(wayPoints[currentPoint].position);
+        _agent.SetDestination(wayPoints[_currentPoint].position);
         // 次にエージェントが向かうウェイポイントのインデックスを保持
-        currentPoint = (currentPoint + 1) % wayPoints.Length;
+        _currentPoint = (_currentPoint + 1) % wayPoints.Length;
 
     }
 

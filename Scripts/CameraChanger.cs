@@ -6,75 +6,99 @@ using Cinemachine;
 using System.IO;
 using TMPro;
 using Unity.VisualScripting;
+using System.Threading.Tasks;
+using UnityEngine.InputSystem.XR;
 
 public class CameraChanger : MonoBehaviour
 {
-
-    // UIController
-    public UIController uIController;
-    // TimerScript
-    public TimerScript timerScript;
-    // PlayerController
+    // PlayerControllerスクリプト
     public PlayerController playerController;
 
-    /// <summary>
-    /// 一人称視点の参照
-    /// </summary>
-    [SerializeField]
-    private CinemachineVirtualCamera firstPersonCamera;
+    // UIControllerスクリプト
+    public UIController uIController;
 
-    /// <summary>
-    /// 三人称視点の参照
-    /// </summary>
+    // TimeManagerスクリプト
+    public TimeManager timeManager;
+
+    // SoundManagerスクリプト
+    public SoundManager soundManager;
+
+    // EffectControllerスクリプト
+    public EffectController _effectController;
+
+    // 一人称視点の参照
     [SerializeField]
-    private CinemachineVirtualCamera thirdPersonCamera;
+    private CinemachineVirtualCamera _firstPersonCamera;
+
+
+    // 三人称視点の参照
+    [SerializeField]
+    private CinemachineVirtualCamera _thirdPersonCamera;
 
     /// STAGE名
     [SerializeField]
-    private string stage;
+    private string _stage;
 
     // プレイヤーのゲームオブジェクト
     [SerializeField]
-    private GameObject player;
+    private GameObject _player;
 
     // 撮影判定true
     [SerializeField]
-    private GameObject trueImg;
+    private GameObject _trueImg;
 
     // 撮影判定false
     [SerializeField]
-    private GameObject falseImg;
+    private GameObject _falseImg;
+
+    // itempickのイメージ
+    public Sprite itemPickSprite;
+
+    // itemthrowのイメージ
+    public Sprite itemThrowSprite;
+
+    // ScreenShotのイメージ
+    public Sprite screenShotSprite;
+
+    // Actionボタンのイメージ
+    public Image actionImg;
 
     // 撮影用UIButton
     [SerializeField]
-    private GameObject CameraShotUIButton;
+    private GameObject _actionUIButton;
+
+    // 移動用UIButton
+    [SerializeField]
+    private GameObject _moveUIButton;
+
+    // item(シーン上のアイテム)
+    [SerializeField]
+    private GameObject _itemObject;
+
+    // item(投げるアイテム)
+    [SerializeField]
+    private GameObject _itemThrowObject;
 
     // 一人称フラグ
-    [SerializeField]
-    private bool isFPS;
+    public bool isFPS;
+
+    // itempickフラグ
+    public bool itemPickFlg = false;
+
+    // itemthrowフラグ
+    public bool itemThrowFlg = false;
 
     // 撮影判定フラグ
-    public bool filmflg = false;
-
-    // 撮影判定フラグ
-    public bool shotEffect = false;
-
-    // pauseフラグ
-    [SerializeField]
-    private bool pauseFlag = false;
+    public bool filmFlg = false;
 
     // rayCastフラグ
     [SerializeField]
-    private bool rayCastFlag = false;
-
-    // ワールド座標フラグ
-    [SerializeField]
-    private bool isVisibleByCameraFlag = false;
+    private bool _rayCastFlg = false;
 
     // 撮影回数テキスト
     public TextMeshProUGUI cameraShotText;
 
-    // 撮影回数テキスト
+    // 撮影対象テキスト
     public TextMeshProUGUI targetText;
 
     // アイテムテキスト
@@ -87,7 +111,7 @@ public class CameraChanger : MonoBehaviour
     public int targetCount = 1;
 
     // 検出可能な距離
-    public float distance = 6.0f;
+    public float distance = 7.0f;
 
     // Captureクラス(キャプチャデータ保存用)
     [System.Serializable]
@@ -96,8 +120,10 @@ public class CameraChanger : MonoBehaviour
         public string capturePath { get; set; }
         public bool judge { get; set; }
     }
+    
     // キャプチャリスト
     public List<Capture> cameraShotList =  new List<Capture>();
+    
     // キャプチャリスト（データ保存用）
     public static List<Capture> saveCaptureList =  new List<Capture>();
 
@@ -105,13 +131,18 @@ public class CameraChanger : MonoBehaviour
     {
         // 最初は三人称から
         SetThirdPersonCamera();
+
         // 撮影判定イメージの設定
-        trueImg.SetActive(false);
-        falseImg.SetActive(true);
+        _trueImg.SetActive(false);
+        _falseImg.SetActive(true);
+
         // 開始時のテキストを設定
         cameraShotText.text = "残り撮影回数:" + cameraShotCount;
         targetText.text = "残り撮影対象:" + targetCount;
-        itemText.text = "にんにく：なし";
+        itemText.text = "アイテム：なし";
+
+        // ActionUIButtonの初期イメージ
+        actionImg.sprite = screenShotSprite;
     }
 
     void Update()
@@ -120,37 +151,37 @@ public class CameraChanger : MonoBehaviour
         cameraShotText.text = "残り撮影回数:" + cameraShotCount;
         targetText.text = "残り撮影対象:" + targetCount;
 
-        // アイテムフラグがtrueの場合
-        if (playerController._itemFlag)
+        // アイテムを持っている場合
+        if (itemThrowFlg)
         {
-            itemText.text = "にんにく：あり";
+            itemText.text = "アイテム：あり";
         }
-        
-        // ポーズ判定時は以降の処理を行わない
-        if(pauseFlag)
+        else
         {
-            return;
+            itemText.text = "アイテム：なし";
         }
 
-        // 撮影を行わない限りはOFF
-        shotEffect = false;
-
+        // 一人称判定
         if(isFPS){
+
             //カメラ内外判定
             IsVisibleByCamera();
-            // フラグによるオブジェクト判定
-            if(isVisibleByCameraFlag && rayCastFlag)
+            
+            // 撮影対象のレイキャスト当たり判定
+            if(_rayCastFlg)
             {
-                trueImg.SetActive(true);
-                falseImg.SetActive(false);
+                // 撮影判定を〇とする
+                _trueImg.SetActive(true);
+                _falseImg.SetActive(false);
             }
             else
             {
-                trueImg.SetActive(false);
-                falseImg.SetActive(true);
+                // 撮影判定を×とする
+                _trueImg.SetActive(false);
+                _falseImg.SetActive(true);
             }
         }
-        // ゲームオーバー判定
+        // ゲームオーバー判定(2秒待機)
         Invoke(nameof(GameOver), 2f);
 
     }
@@ -163,12 +194,12 @@ public class CameraChanger : MonoBehaviour
     {
         if (isFPS)
         {
-            // 三人称
+            // 三人称モード
             SetThirdPersonCamera();
         }
         else
         {
-            // 一人称
+            // 一人称モード
             SetFirstPersonCamera();
         }
     }
@@ -178,10 +209,13 @@ public class CameraChanger : MonoBehaviour
     /// </summary>
     private void SetFirstPersonCamera()
     {
-        firstPersonCamera.Priority = 10;
-        thirdPersonCamera.Priority = 0;
-        // カメラ撮影ボタンを活性
-        CameraShotUIButton.SetActive(true);
+        // カメラのPriorityを変更し一人称カメラ優先とする
+        _firstPersonCamera.Priority = 10;
+        _thirdPersonCamera.Priority = 0;
+
+        // アクションボタン活性、移動ボタン非活性、一人称フラグ活性
+        _actionUIButton.SetActive(true);
+        _moveUIButton.SetActive(false);
         isFPS = true;
     }
 
@@ -190,12 +224,42 @@ public class CameraChanger : MonoBehaviour
     /// </summary>
     private void SetThirdPersonCamera()
     {
-        firstPersonCamera.Priority = 0;
-        thirdPersonCamera.Priority = 10;
-        // カメラ撮影ボタンを活性
-        CameraShotUIButton.SetActive(false);
+        // カメラのPriorityを変更し三人称カメラ優先とする
+        _firstPersonCamera.Priority = 0;
+        _thirdPersonCamera.Priority = 10;
+
+        // アクションボタン非活性、移動ボタン活性、一人称フラグ非活性
+        _actionUIButton.SetActive(false);
+        _moveUIButton.SetActive(true);
         isFPS = false;
     }
+
+
+    /// <summary>
+    /// アクション機能
+    /// <summary>
+    public void Action()
+    {
+        // itemPickFlgがtrue、itemThrowFlgがfalse
+        if (itemPickFlg && !itemThrowFlg)
+        {
+            // アイテム収集を実行
+            ItemPick();
+        }
+        // itemPickFlgがfalse、itemThrowFlgがtrue
+        else if (!itemPickFlg && itemThrowFlg)
+        {
+            // アイテム投下を実行
+            ItemThrow();
+        }
+        // それ以外
+        else
+        {
+            // 撮影機能を実行
+            ScreenShot();
+        }
+    }
+
 
     /// <summary>
     /// 撮影機能
@@ -203,24 +267,25 @@ public class CameraChanger : MonoBehaviour
     public void ScreenShot()
     {
         // シャッター音を鳴らす
-        GetComponent<AudioSource>().Play();
+        soundManager.SoundClip1();
 
         // 撮影回数カウントを増やす
         cameraShotCount--;
         //撮影エフェクトを表示
-        shotEffect = true;
+        _effectController.ShutterEffect();
+
         // カメラ撮影の判定
-        if(isVisibleByCameraFlag && rayCastFlag)
+        if (_rayCastFlg)
         {
             // 撮影成功
-            filmflg = true;
+            filmFlg = true;
             // 撮影対象カウントを減らす
             targetCount--;
         }
         else
         {
             // 撮影失敗
-            filmflg = false;
+            filmFlg = false;
         }
         //Invorkeはキャプチャの保存とゲームクリア判定が正しく行われるための対策
         // スクリーンショットを保存する(1秒後)
@@ -230,15 +295,62 @@ public class CameraChanger : MonoBehaviour
     }
 
     /// <summary>
+    /// アイテム収集
+    /// </summary>
+    public void ItemPick()
+    {
+        // アイテム収集時の効果音
+        soundManager.SoundClip2();
+
+        // ボタンの画像差し替え
+        actionImg.sprite = itemThrowSprite;
+        
+        // 収集アイテムを非表示
+        _itemObject.gameObject.SetActive(false);
+        
+        // フラグの変更
+        itemPickFlg = false;
+        itemThrowFlg = true;
+    }
+
+    /// <summary>
+    /// アイテム投下
+    /// </summary>
+    public async void ItemThrow()
+    {
+        // アイテム投下時の効果音
+        soundManager.SoundClip3();
+
+        // ボタンの画像差し替え
+        actionImg.sprite = screenShotSprite;
+        
+        // 投下アイテムの生成
+        GameObject item = Instantiate(_itemThrowObject,new Vector3(_player.transform.position.x,2, _player.transform.position.z),Quaternion.identity);
+        
+        // 投下時の設定
+        item.GetComponent<Rigidbody>().AddForce(_player.transform.forward * 300);
+        
+        // フラグの変更
+        itemPickFlg = false;
+        itemThrowFlg = false;
+        
+        //1秒停止後、アイテム削除(撮影対象に当たらなかった場合の対処)
+        await Task.Delay(1000);
+        Destroy(item);
+    }
+
+    /// <summary>
     /// スクリーンショット保存
     /// <summary>
     private void SavePicture()
     {
+        // ディレクトリ、キャプチャ等の名前を定義
         Capture c = new Capture();
         string date = System.DateTime.Now.ToString("yyyyMMddHHmmss");
 
-        var directory = Application.persistentDataPath + "/" + stage;
-        var screenShotPicture = directory + "/" + stage + "_"+ (10 - cameraShotCount) + "_" + date +  ".png";
+        var directory = Application.persistentDataPath + "/" + _stage;
+        var screenShotPicture = directory + "/" + _stage + "_"+ (10 - cameraShotCount) + "_" + date +  ".png";
+
         // ステージのディレクトリがない場合
         if (!System.IO.Directory.Exists(directory))
         {
@@ -254,10 +366,10 @@ public class CameraChanger : MonoBehaviour
             ScreenCapture.CaptureScreenshot(screenShotPicture);
         }
 
-        //撮影結果のリストにスクリーンショットを入れる(成功、失敗ともに)
-        c.stageName = stage;
+        // 撮影結果のリストにスクリーンショットを入れる(成功、失敗ともに)
+        c.stageName = _stage;
         c.capturePath = screenShotPicture;
-        if(filmflg){
+        if(filmFlg){
             c.judge = true;
         }
         else
@@ -267,14 +379,16 @@ public class CameraChanger : MonoBehaviour
         cameraShotList.Add(c);
     }
 
-    /// カメラ内外撮影判定
+    /// <summary>
+    /// カメラ撮影判定(レイキャストによる対象物判定)
+    /// </summary>
     public void IsVisibleByCamera() {
         // 一人称時点の場合に判定処理を行う
         // RayCastによるオブジェクト判定
         // Rayはカメラの位置からとばす
-        var rayStartPosition = firstPersonCamera.transform.position;
+        var rayStartPosition = _firstPersonCamera.transform.position;
         // Rayはカメラが向いてる方向にとばす
-        var rayDirection = firstPersonCamera.transform.forward.normalized;
+        var rayDirection = _firstPersonCamera.transform.forward.normalized;
 
         // Hitしたオブジェクト格納用
         RaycastHit raycastHit;
@@ -285,53 +399,21 @@ public class CameraChanger : MonoBehaviour
         // Debug.DrawRay (Vector3 start(rayを開始する位置), Vector3 dir(rayの方向と長さ), Color color(ラインの色));
         Debug.DrawRay(rayStartPosition, rayDirection * distance, Color.red);
 
-        // なにかを検出したら
-        if (isHit)
+        // レイキャストで何かを確認かつそれが撮影対象であればレイキャストフラグを立てる
+        if (isHit && raycastHit.collider.gameObject.CompareTag("Target"))
         {
-            rayCastFlag = true;
+            _rayCastFlg = true;
         }
         else
         {
-            rayCastFlag = false;
+            _rayCastFlg = false;
         }
-        // 検出したオブジェクトが対象のオブジェクトの場合、処理を行う
-        if(rayCastFlag)
-        {
-            if(raycastHit.collider.gameObject.CompareTag("Target")){
-                // ワールド座標によるカメラ内外判定
-                // プレイヤーの位置
-                Vector3 playerPos = player.transform.position;
 
-                // 撮影対象の位置(Raycastで見つけたオブジェクト)
-                Vector3 targetPos = raycastHit.collider.gameObject.transform.position;
-                // 撮影対象とプレイヤーの距離を取得
-                float dis = Vector3.Distance(targetPos, playerPos);
-
-                // 撮影対象のワールド座標を取得
-                Vector3 viewPos = Camera.main.WorldToViewportPoint(targetPos);
-
-                // viewPosのx座標とy座標が0以上1以下かつzが0以上だったらみえる
-                if (viewPos.x >= 0 && viewPos.x <=1 &&
-                    viewPos.y >= 0 && viewPos.y <=1 && viewPos.z >=0) {
-                    if (dis <= distance){
-                        isVisibleByCameraFlag = true;
-                    }
-                    else {
-                        isVisibleByCameraFlag = false;
-                    }
-                }
-            }
-            else
-            {
-                isVisibleByCameraFlag = false;
-            }
-        }
-        else
-        {
-            isVisibleByCameraFlag = false;
-        }
     }
 
+    /// <summary>
+    /// ゲームクリア
+    /// </summary>
     public void GameClear(){
         // 撮影対象カウントが0になったらゲームクリア
         if(targetCount == 0)
@@ -350,13 +432,17 @@ public class CameraChanger : MonoBehaviour
                     System.IO.File.Delete(cameraShot.capturePath);
                 }
             }
+            // 撮影したキャプチャを確認したらゲームクリア
             uIController.ActiveGameClear();
         }
     }
 
+    /// <summary>
+    /// ゲームオーバー
+    /// </summary>
     public void GameOver(){
         // 撮影回数が0または制限時間が0になったらゲームオーバー
-        if(cameraShotCount == 0 || !timerScript.timerIsRunning)
+        if(cameraShotCount == 0 || !timeManager.timerIsRunning)
         {
             uIController.ActiveGameOver();
         }

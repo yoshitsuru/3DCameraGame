@@ -3,15 +3,17 @@ using UnityEngine.UI;
 using System.Collections;
 using TMPro;
 
-public class TimerScript : MonoBehaviour
+public class TimeManager : MonoBehaviour
 {
    public float timeRemaining = 10;
+
    public bool timerIsRunning = false;
-   public TextMeshProUGUI timeText;
+   
+   private TextMeshProUGUI _timeText;
 
    private void Start()
    {
-       // Starts the timer automatically
+        _timeText = GameObject.Find("Time").GetComponent<TextMeshProUGUI>();
        timerIsRunning = true;
    }
 
@@ -40,6 +42,6 @@ public class TimerScript : MonoBehaviour
        float minutes = Mathf.FloorToInt(timeToDisplay / 60);
        float seconds = Mathf.FloorToInt(timeToDisplay % 60);
 
-       timeText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+       _timeText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
    }
 }

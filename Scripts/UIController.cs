@@ -4,15 +4,20 @@ using UnityEngine.SceneManagement;
 public class UIController : MonoBehaviour
 {
     /// 現在アクティブなシーン
-    string sceneName;
+    public string sceneName;
+
     // ポーズ画面
     public GameObject pauseCanvas;
+
     // ゲームオーバー画面
     public GameObject gameOverCanvas;
+
     // ゲームクリア画面
     public GameObject gameClearCanvas;
+
     //ポーズフラグ
     public bool pauseFlg;
+
     // エフェクトパネル(撮影時のフラッシュ)
     public GameObject effectPanel;
 
@@ -29,7 +34,7 @@ public class UIController : MonoBehaviour
 
     public void OnClickStartButton()
     {
-        SceneManager.LoadScene("CameraGameScene");
+        SceneManager.LoadScene("Camera3DGameScene");
     }
 
     public void OnClickEndButton()
@@ -53,13 +58,11 @@ public class UIController : MonoBehaviour
     public void ActiveGameOver()
     {
         gameOverCanvas.SetActive(true);
-        effectPanel.SetActive(false);
         Time.timeScale = 0.0f;
     }
     public void ActiveGameClear()
     {
         gameClearCanvas.SetActive(true);
-        effectPanel.SetActive(false);
         Time.timeScale = 0.0f;
     }
 }

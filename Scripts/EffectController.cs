@@ -7,31 +7,24 @@ public class EffectController : MonoBehaviour
 {
 
     // 撮影エフェクトイメージ
-    private Image img;
-
-    // 撮影エフェクトフラグを取得するためCameraChangeスクリプトを取得
-    public CameraChanger cameraChanger;
+    private Image _img;
 
     // Start is called before the first frame update
     void Start()
     {
-        // 撮影時のエフェクト設定
-        img = GetComponent<Image>();
-        img.color = Color.clear;
+        // フラッシュ制御
+        _img = GetComponent<Image>();
+        _img.color = Color.clear;
     }
 
-    // Update is called once per frame
     void Update()
     {
-        // 撮影された場合、エフェクトを発生させる
-        if (cameraChanger.shotEffect)
-        {
-            img.color = new Color(1, 1, 1, 1);
-        }
-        else
-        {
-            // エフェクト発生後、少しずつ色を元に戻す。
-             img.color = Color.Lerp(img.color, Color.clear, Time.deltaTime);
-        }
+        // フラッシュの制御
+        _img.color = Color.Lerp(_img.color, Color.clear, Time.deltaTime);
+    }
+
+    public void ShutterEffect()
+    {
+        _img.color = new Color(1, 1, 1, 1);
     }
 }
