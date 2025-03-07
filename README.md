@@ -25,7 +25,7 @@
 
 ステージのグラフィック：Demo City By Versatile Studio
 
-##　**実装**
+## **実装**
 
 ・視点切り替え 
 
